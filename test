@@ -1,6 +1,11 @@
 #!/usr/bin/env python2
+# -*- coding: utf-8 -*-
 
+import re
 import json
+import tldextract
+
+import regex
 
 from nltk.stem import snowball
 
@@ -38,6 +43,31 @@ def cleanWord(word):
 
 FNAME = "posts.json"
 
+
+ACCENTS = ((u'à', u'a'), (u'á', u'a'), (u'è', u'e'), (u'é', u'e'), (u'ì', u'i'), 
+           (u'í', u'i'), (u'ò', u'o'), (u'ó', u'o'),
+           (u'ù', u'u'), (u'ú', u'u'), (u'ñ', 'n'))
+
+def clean(s):
+    """ turns string to lowercase and removes all accents """
+    s = s.lower()
+    for c_old, c_new in ACCENTS:
+        s = s.replace(c_old,c_new)
+    return s
+
+def tokenize(message):
+    urls = re.findall(regex.findUrl, message)
+    found_urls = []
+    for url in urls:
+        found_urls += url.group(0)
+
+    for url in found_urls:
+        domain = tldextract.extract(url).domain
+        message.replace(url, u"__url" + domain)
+
+    tokens = re.findall(r"[\w']+", message)
+    return [clean(t) for t in tokens] 
+
 def run():
     with open(FNAME) as f:
         posts = json.load(f)
@@ -45,7 +75,8 @@ def run():
     for post in posts:
         data = post['text'][1:].decode('hex')
         data = data.decode('utf-8')
-        print data.encode('utf-8')
+        print tokenize(data)
+        #print data.encode('utf-8')
 
 if __name__=="__main__":
     run()
