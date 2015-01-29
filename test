@@ -2,6 +2,40 @@
 
 import json
 
+from nltk.stem import snowball
+
+commonWords = [
+    'de', 'la', 'que', 'el', 'en', 'y', 'a', 'los', 'se', 'del', 'las', 'un',
+    'por', 'con', 'no', 'una', 'su', 'para', 'es', 'al', 'lo', 'como', 'mas',
+    'o', 'pero', 'sus', 'le', 'ha', 'me', 'si', 'sin', 'sobre', 'este', 'ya',
+    'entre', 'cuando', 'todo', 'esta', 'ser', 'son', 'dos', 'tambien', 'fue',
+    'habia', 'era', 'muy', 'anos', 'hasta', 'desde', 'esta', 'mi', 'porque',
+    'que', 'solo', 'han', 'yo', 'hay', 'vez', 'puede', 'todos', 'asi', 'nos',
+    'ni', 'parte', 'tiene', 'el', 'uno', 'donde', 'bien', 'tiempo', 'mismo',
+    'ese', 'ahora', 'cada', 'e', 'vida', 'otro', 'despues', 'te', 'otros',
+    'aunque', 'esa', 'eso', 'hace', 'otra', 'gobierno', 'tan', 'durante',
+    'siempre', 'dia', 'tanto', 'ella', 'tres', 'si', 'dijo', 'sido', 'gran',
+    'pais', 'segun', 'de', 'la', 'i', 'el', 'a', 'l', 'en', 'va', 'de', 'que',
+    'del', 'un', 'les', 'amb', 'per', 'una', 'els', 'es', 'al', 'es', 'dels',
+    'ser', 'van', 'o', 'com', 'mes', 'no', 's', 'seva', 'fou', 'entre', 'pero',
+    'seu', 'com', 'per', 'tambe', 'son', 'als', 'on', 'aquest', 'anys',
+    'ciutat', 'era', 'pel', 'despres', 'va', 'aquesta', 'part', 'gran', 'ha',
+    'durant', 'sobre', 'any', 'nom', 'estat', 'altres', 'havia', 'dos', 'rei',
+    'molt', 'primer', 'quan', 'fer', 'li', 'contra', 'pels', 'cap', 'els seus',
+    'seves', 'pot', 'temps', 'mateix', 'hi', 'tres', 'forma', 'esta',
+    'guerra', 'te', 'despres', 'fins', 'fill',
+
+    'http', 'facebook', 'google', 'com', 'org', 'net', 'cat', 'es', 'www'
+];
+
+s = snowball.SpanishStemmer()
+
+def cleanWord(word):
+    if word in commonWords:
+        return None
+    return s.stem(word)
+
+
 FNAME = "posts.json"
 
 def run():
