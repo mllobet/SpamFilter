@@ -1,0 +1,17 @@
+#!/usr/bin/env python2
+
+import json
+
+FNAME = "posts.json"
+
+def run():
+    with open(FNAME) as f:
+        posts = json.load(f)
+
+    for post in posts:
+        data = post['text'][1:].decode('hex')
+        data = data.decode('utf-8')
+        print data.encode('utf-8')
+
+if __name__=="__main__":
+    run()
