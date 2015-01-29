@@ -9,6 +9,10 @@ import regex
 
 from nltk.stem import snowball
 
+FNAME = "posts.json"
+
+s = snowball.SpanishStemmer()
+
 commonWords = [
     'de', 'la', 'que', 'el', 'en', 'y', 'a', 'los', 'se', 'del', 'las', 'un',
     'por', 'con', 'no', 'una', 'su', 'para', 'es', 'al', 'lo', 'como', 'mas',
@@ -33,18 +37,7 @@ commonWords = [
     'http', 'facebook', 'google', 'com', 'org', 'net', 'cat', 'es', 'www'
 ];
 
-s = snowball.SpanishStemmer()
-
-def cleanWord(word):
-    if word in commonWords:
-        return None
-    return s.stem(word)
-
-
-FNAME = "posts.json"
-
-
-ACCENTS = ((u'à', u'a'), (u'á', u'a'), (u'è', u'e'), (u'é', u'e'), (u'ì', u'i'), 
+ACCENTS = ((u'à', u'a'), (u'á', u'a'), (u'è', u'e'), (u'é', u'e'), (u'ì', u'i'),
            (u'í', u'i'), (u'ò', u'o'), (u'ó', u'o'),
            (u'ù', u'u'), (u'ú', u'u'), (u'ñ', 'n'))
 
@@ -54,6 +47,11 @@ def clean(s):
     for c_old, c_new in ACCENTS:
         s = s.replace(c_old,c_new)
     return s
+
+def cleanWord(word):
+    if word in commonWords:
+        return None
+    return clean(s.stem(word))
 
 def tokenize(message):
     urls = re.findall(regex.findUrl, message)
@@ -66,7 +64,11 @@ def tokenize(message):
         message.replace(url, u"__url" + domain)
 
     tokens = re.findall(r"[\w']+", message)
-    return [clean(t) for t in tokens] 
+    for t in tokens:
+        t = cleanWord(t)
+        if t is None:
+            continue
+        yield t
 
 def run():
     with open(FNAME) as f:
@@ -75,8 +77,27 @@ def run():
     for post in posts:
         data = post['text'][1:].decode('hex')
         data = data.decode('utf-8')
-        print tokenize(data)
-        #print data.encode('utf-8')
+        print list(tokenize(data))
+
+
+def generate_map():
+    feat_index = 0
+    features = {}
+
+    with open(FNAME) as f:
+        posts = json.load(f)
+
+    for post in posts:
+        data = post['text'][1:].decode('hex')
+        data = data.decode('utf-8')
+        for token in tokenize(data):
+            if token not in features:
+                features[token] = feat_index
+                feat_index += 1
+
+    return (feat_index, features)
 
 if __name__=="__main__":
-    run()
+    (size, m) = generate_map()
+    print m
+    print size
