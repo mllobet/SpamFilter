@@ -6,6 +6,7 @@ import json
 import tldextract
 
 import regex
+from scipy.sparse import csr_matrix
 
 from nltk.stem import snowball
 
@@ -87,15 +88,34 @@ def generate_map():
     with open(FNAME) as f:
         posts = json.load(f)
 
+    data = []
+    row_ind = []
+    col_ind = []
+
+    postid = 0
     for post in posts:
-        data = post['text'][1:].decode('hex')
-        data = data.decode('utf-8')
-        for token in tokenize(data):
+        text = post['text'][1:].decode('hex')
+        text = text.decode('utf-8')
+
+        postfeatures = {}
+        for token in tokenize(text):
             if token not in features:
                 features[token] = feat_index
                 feat_index += 1
+            featureid = features[token]
+            if featureid not in postfeatures:
+                postfeatures[featureid] = 1
+            else:
+                postfeatures[featureid] += 1
 
-    return (feat_index, features)
+        for (id, count) in postfeatures.items():
+            data.append(count)
+            row_ind.append(postid)
+            col_ind.append(id)
+
+        postid += 1
+
+    return csr_matrix(data, (row_ind, col_ind))
 
 if __name__=="__main__":
     (size, m) = generate_map()
