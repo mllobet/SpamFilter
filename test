@@ -9,6 +9,7 @@ import regex
 from scipy.sparse import csr_matrix
 
 from nltk.stem import snowball
+from sklearn import svm
 
 FNAME = "posts.json"
 
@@ -81,19 +82,18 @@ def run():
         print list(tokenize(data))
 
 
-def generate_map():
+def generate_map(posts):
     feat_index = 0
     features = {}
-
-    with open(FNAME) as f:
-        posts = json.load(f)
 
     data = []
     row_ind = []
     col_ind = []
 
     postid = 0
+    labels = []
     for post in posts:
+        labels.append(int(post['state']))
         text = post['text'][1:].decode('hex')
         text = text.decode('utf-8')
 
@@ -114,10 +114,38 @@ def generate_map():
             col_ind.append(id)
 
         postid += 1
+        if postid == 16000:
+            break
 
-    return csr_matrix(data, (row_ind, col_ind))
+    return (csr_matrix((data, (row_ind, col_ind)), shape=(postid, feat_index)), labels, features, feat_index)
+
+def get_feature_vector(text, features, num_features):
+    vector = [0]*num_features
+    for token in tokenize(text):
+        if token not in features:
+            continue
+        vector[features[token]] += 1
+
+    return vector
 
 if __name__=="__main__":
-    (size, m) = generate_map()
-    print m
-    print size
+    with open(FNAME) as f:
+        posts = json.load(f)
+        (X, y, features, num_features) = generate_map(posts[:16000])
+        clf = svm.SVC()
+        clf.fit(X, y)
+
+        correct = 0
+        for post in posts[16000:]:
+            pred = clf.predict(get_feature_vector(post['text'][1:].decode('hex').decode('utf-8'), features, num_features))[0]
+            v = int(post['state'])
+            print "---"
+            print pred
+            print v
+            if pred == v:
+                correct += 1
+                
+        print "OPness: "
+        print correct
+        print float(correct)/(len(posts) - 16000)
+
