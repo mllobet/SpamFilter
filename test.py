@@ -4,16 +4,17 @@
 import re
 import json
 import tldextract
+import random
 
 import regex
 from scipy.sparse import csr_matrix
 
-from nltk.stem import snowball
-from sklearn import svm
+import stemmer
+from sklearn import naive_bayes
 
 FNAME = "posts.json"
 
-s = snowball.SpanishStemmer()
+s = stemmer.SpanishStemmer()
 
 commonWords = [
     'de', 'la', 'que', 'el', 'en', 'y', 'a', 'los', 'se', 'del', 'las', 'un',
@@ -36,34 +37,66 @@ commonWords = [
     'seves', 'pot', 'temps', 'mateix', 'hi', 'tres', 'forma', 'esta',
     'guerra', 'te', 'despres', 'fins', 'fill',
 
-    'http', 'facebook', 'google', 'com', 'org', 'net', 'cat', 'es', 'www'
+    'http', 'facebook', 'google', 'com', 'org', 'net', 'cat', 'es', 'www',
+
+    'k', 'xd', 'q', 'xq'
 ];
 
 ACCENTS = ((u'à', u'a'), (u'á', u'a'), (u'è', u'e'), (u'é', u'e'), (u'ì', u'i'),
            (u'í', u'i'), (u'ò', u'o'), (u'ó', u'o'),
-           (u'ù', u'u'), (u'ú', u'u'), (u'ñ', 'n'))
+           (u'ù', u'u'), (u'ú', u'u'), (u'ñ', 'n'),
+           (u'ä', 'a'), (u'ë', 'e'), (u'ï', 'i'), (u'ö', 'o'), (u'ü', 'u'), )
 
-def clean(s):
-    """ turns string to lowercase and removes all accents """
-    s = s.lower()
-    for c_old, c_new in ACCENTS:
-        s = s.replace(c_old,c_new)
-    return s
+PREFIXES = [
+    "m'",
+    "s'",
+    "t'",
+    "l'",
+    "d'",
+    "'"
+]
+SUFFIXES = [
+    "'s",
+    "'"
+]
 
 def cleanWord(word):
+    if word[:6] == u"__url_":
+        return word
+
+    # Lowercase
+    word = word .lower()
+
+    # Remove accents
+    for c_old, c_new in ACCENTS:
+        word = word.replace(c_old,c_new)
+
+    # Remove common prefixes
+    for p in PREFIXES:
+        if word[:len(p)] == p:
+            word = word[len(p):]
+
+    # Remove common suffixes
+    for p in SUFFIXES:
+        if word[-len(p):] == p:
+            word = word[:-len(p)]
+
     if word in commonWords:
         return None
-    return clean(s.stem(word))
+    if len(word) <= 3:
+        return None
+
+    word = s.stem(word)
+    return word
+
+
+def repl(m):
+    url = m.group(0)
+    domain = tldextract.extract(url).domain
+    return u"__url_" + domain
 
 def tokenize(message):
-    urls = re.findall(regex.findUrl, message)
-    found_urls = []
-    for url in urls:
-        found_urls += url.group(0)
-
-    for url in found_urls:
-        domain = tldextract.extract(url).domain
-        message.replace(url, u"__url" + domain)
+    message = re.sub('http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', repl, message)
 
     tokens = re.findall(r"[\w']+", message)
     for t in tokens:
@@ -81,10 +114,12 @@ def run():
         data = data.decode('utf-8')
         print list(tokenize(data))
 
+num_features = 0
+features = {}
 
 def generate_map(posts):
-    feat_index = 0
-    features = {}
+    global num_features
+    global features
 
     data = []
     row_ind = []
@@ -94,14 +129,13 @@ def generate_map(posts):
     labels = []
     for post in posts:
         labels.append(int(post['state']))
-        text = post['text'][1:].decode('hex')
-        text = text.decode('utf-8')
+        text = post["text"]
 
         postfeatures = {}
         for token in tokenize(text):
             if token not in features:
-                features[token] = feat_index
-                feat_index += 1
+                features[token] = num_features
+                num_features += 1
             featureid = features[token]
             if featureid not in postfeatures:
                 postfeatures[featureid] = 1
@@ -114,12 +148,13 @@ def generate_map(posts):
             col_ind.append(id)
 
         postid += 1
-        if postid == 16000:
-            break
 
-    return (csr_matrix((data, (row_ind, col_ind)), shape=(postid, feat_index)), labels, features, feat_index)
+    return (csr_matrix((data, (row_ind, col_ind)), shape=(postid, num_features)), labels)
 
-def get_feature_vector(text, features, num_features):
+def get_feature_vector(text):
+    global features
+    global num_features
+
     vector = [0]*num_features
     for token in tokenize(text):
         if token not in features:
@@ -130,22 +165,56 @@ def get_feature_vector(text, features, num_features):
 
 if __name__=="__main__":
     with open(FNAME) as f:
+        #Load crap
+        print "Loading crap..."
         posts = json.load(f)
-        (X, y, features, num_features) = generate_map(posts[:16000])
-        clf = svm.SVC()
+        for post in posts:
+            post["text"] = post['text'][1:].decode('hex').decode('utf-8')
+
+        print "Shuffling crap..."
+        random.shuffle(posts)
+
+        print "Processing crap..."
+        (X, y) = generate_map(posts[:16000])
+
+        for f in features:
+            print f
+
+        print "num_features = ", num_features
+
+        print "Training using crap..."
+        clf = naive_bayes.MultinomialNB()
         clf.fit(X, y)
 
+        print "Predicting crap..."
         correct = 0
+        v11 = 0
+        v12 = 0
+        v21 = 0
+        v22 = 0
         for post in posts[16000:]:
-            pred = clf.predict(get_feature_vector(post['text'][1:].decode('hex').decode('utf-8'), features, num_features))[0]
+            pred = clf.predict(get_feature_vector(post['text']))[0]
             v = int(post['state'])
-            print "---"
-            print pred
-            print v
+#            print "---"
+#            print pred
+#            print v
+            if pred == 1 and v == 1:
+                v11 += 1
+            if pred == 1 and v == 2:
+                v12 += 1
+            if pred == 2 and v == 1:
+                v21 += 1
+            if pred == 2 and v == 2:
+                v22 += 1
+
             if pred == v:
                 correct += 1
-                
+
         print "OPness: "
         print correct
         print float(correct)/(len(posts) - 16000)
 
+        print "1,1: ", v11
+        print "1,2: ", v12
+        print "2,1: ", v21
+        print "2,2: ", v22
